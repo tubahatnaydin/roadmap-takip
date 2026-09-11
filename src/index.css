@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --accent: #db6c8a;
+  --accent-bg: #fce7f3;
+}
+
+.dark {
+  --accent: #f2a8c0;
+  --accent-bg: rgba(242, 168, 192, 0.18);
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: 'Inter', system-ui, sans-serif;
+}
