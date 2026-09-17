@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { RoadmapNode, Durum } from "./types";
-import { useRoadmapStore, konuBul } from "./store";
-import { useAcikStore } from "./acikStore";
+import type { RoadmapNode, Status } from "../types";
+import { useRoadmapStore, findTopic } from "../store/roadmapStore";
+import { useExpandedStore } from "../store/expandedStore";
 
-const onerilenKaynaklar: Record<number, number[]> = {
+const suggestedResources: Record<number, number[]> = {
     78: [80, 81], // Vite önerilir: React veya Vue tamamlandıysa
     79: [82], // Webpack önerilir: Angular tamamlandıysa
     85: [71], // MongoDB önerilir: Node.js tamamlandıysa
@@ -24,20 +24,20 @@ const onerilenKaynaklar: Record<number, number[]> = {
 
 interface Props {
     node: RoadmapNode;
-    kokMu?: boolean;
-    derinlik?: number;
-    renkIndex?: number;
-    baslangicAcik?: boolean;
-    geriYolu?: string;
-    geriBaslik?: string;
+    isRoot?: boolean;
+    depth?: number;
+    colorIndex?: number;
+    initiallyExpanded?: boolean;
+    backPath?: string;
+    backLabel?: string;
 }
 
-function sonrakiDurum(durum: Durum): Durum {
+function getNextStatus(status: Status): Status {
 
-    if (durum === "Başlanmadı") {
+    if (status === "Başlanmadı") {
         return "Devam Ediliyor";
     }
-    else if (durum === "Devam Ediliyor") {
+    else if (status === "Devam Ediliyor") {
         return "Tamamlandı";
     }
     else {
@@ -45,122 +45,122 @@ function sonrakiDurum(durum: Durum): Durum {
     }
 }
 
-function tumKonularinSayisi(node: RoadmapNode): number {
+function getTotalCount(node: RoadmapNode): number {
     if (node.children.length === 0) {
         return 1;
     }
 
-    if (node.secilebilir) {
+    if (node.selectable) {
         return 1;
     }
 
-    let toplam = 0;
+    let total = 0;
 
     node.children.forEach((child) => {
-        toplam = toplam + tumKonularinSayisi(child);
+        total = total + getTotalCount(child);
     });
 
-    return toplam;
+    return total;
 }
 
-function tamamlananSayisi(node: RoadmapNode): number {
+function getCompletedCount(node: RoadmapNode): number {
     if (node.children.length === 0) {
-        return node.durum === "Tamamlandı" ? 1 : 0;
+        return node.status === "Tamamlandı" ? 1 : 0;
     }
 
-    if (node.secilebilir) {
-        const biriTamamlandiMi = node.children.some(
-            (child) => tamamlananSayisi(child) === tumKonularinSayisi(child)
+    if (node.selectable) {
+        const isOneCompleted = node.children.some(
+            (child) => getCompletedCount(child) === getTotalCount(child)
         );
-        return biriTamamlandiMi ? 1 : 0;
+        return isOneCompleted ? 1 : 0;
     }
 
-    let toplam = 0;
+    let total = 0;
 
     node.children.forEach((child) => {
-        toplam = toplam + tamamlananSayisi(child);
+        total = total + getCompletedCount(child);
     });
 
-    return toplam;
+    return total;
 }
 
-function herhangiBiriDevamEdiyorMu(node: RoadmapNode): boolean {
+function isAnyInProgress(node: RoadmapNode): boolean {
     if (node.children.length === 0) {
-        return node.durum === "Devam Ediliyor";
+        return node.status === "Devam Ediliyor";
     }
-    return node.children.some((child) => herhangiBiriDevamEdiyorMu(child));
+    return node.children.some((child) => isAnyInProgress(child));
 }
 
-function altKonularinIdleri(node: RoadmapNode): number[] {
-    let idler: number[] = [];
+function getChildTopicIds(node: RoadmapNode): number[] {
+    let ids: number[] = [];
     node.children.forEach((child) => {
-        if (child.secilebilir) {
+        if (child.selectable) {
             return;
         }
-        idler.push(child.id);
-        idler = idler.concat(altKonularinIdleri(child));
+        ids.push(child.id);
+        ids = ids.concat(getChildTopicIds(child));
     });
-    return idler;
+    return ids;
 }
 
-function altSecimVarMi(node: RoadmapNode): boolean {
-    return node.children.some((child) => child.secilebilir || altSecimVarMi(child));
+function hasSelectableChild(node: RoadmapNode): boolean {
+    return node.children.some((child) => child.selectable || hasSelectableChild(child));
 }
 
-const durumIkonRenkleri = {
+const statusIconColors = {
     "Başlanmadı": "text-stone-300 dark:text-stone-600",
     "Devam Ediliyor": "text-[var(--accent)]/60",
     "Tamamlandı": "text-[var(--accent)]",
 };
 
 
-function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu, geriBaslik }: Props) {
+function TopicRow({ node, isRoot, depth, colorIndex, initiallyExpanded, backPath, backLabel }: Props) {
 
-    const seviye = derinlik ?? 0;
+    const level = depth ?? 0;
 
     const roadmaps = useRoadmapStore((state) => state.roadmaps);
-    const konuEkle = useRoadmapStore((state) => state.konuEkle);
-    const konuSil = useRoadmapStore((state) => state.konuSil);
-    const [altKonuBaslik, setAltKonuBaslik] = useState("");
-    const acikMap = useAcikStore((state) => state.acikMap);
-    const setAcikGlobal = useAcikStore((state) => state.setAcik);
-    const varsayilanAcik = baslangicAcik ?? !kokMu;
-    const acik = acikMap[node.id] ?? varsayilanAcik;
-    const [ekleAcik, setEkleAcik] = useState(false);
+    const addTopic = useRoadmapStore((state) => state.addTopic);
+    const deleteTopic = useRoadmapStore((state) => state.deleteTopic);
+    const [newTopicTitle, setNewTopicTitle] = useState("");
+    const expandedMap = useExpandedStore((state) => state.expandedMap);
+    const setExpandedGlobal = useExpandedStore((state) => state.setExpanded);
+    const defaultExpanded = initiallyExpanded ?? !isRoot;
+    const expanded = expandedMap[node.id] ?? defaultExpanded;
+    const [isAddOpen, setIsAddOpen] = useState(false);
 
 
-    const updateDurum = useRoadmapStore((state) => state.updateDurum);
+    const updateStatus = useRoadmapStore((state) => state.updateStatus);
 
     const hasChildren = node.children.length > 0;
-    const tetikleyiciler = onerilenKaynaklar[node.id];
-    const onerildi = tetikleyiciler?.some((id) => {
-        const tetikleyiciKonu = konuBul(roadmaps, id);
-        if (!tetikleyiciKonu) {
+    const triggers = suggestedResources[node.id];
+    const isSuggested = triggers?.some((id) => {
+        const triggerTopic = findTopic(roadmaps, id);
+        if (!triggerTopic) {
             return false;
         }
-        if (tetikleyiciKonu.children.length === 0) {
-            return tetikleyiciKonu.durum === "Tamamlandı";
+        if (triggerTopic.children.length === 0) {
+            return triggerTopic.status === "Tamamlandı";
         }
-        return tamamlananSayisi(tetikleyiciKonu) === tumKonularinSayisi(tetikleyiciKonu);
+        return getCompletedCount(triggerTopic) === getTotalCount(triggerTopic);
     }) ?? false;
-    const yuzde = Math.round((tamamlananSayisi(node) / tumKonularinSayisi(node)) * 100);
+    const percentage = Math.round((getCompletedCount(node) / getTotalCount(node)) * 100);
 
-    let gosterilecekDurum: Durum;
+    let displayStatus: Status;
 
     if (node.children.length === 0) {
-        gosterilecekDurum = node.durum;
+        displayStatus = node.status;
     }
-    else if (yuzde === 100) {
-        gosterilecekDurum = "Tamamlandı";
+    else if (percentage === 100) {
+        displayStatus = "Tamamlandı";
     }
-    else if (yuzde === 0 && !herhangiBiriDevamEdiyorMu(node)) {
-        gosterilecekDurum = "Başlanmadı";
+    else if (percentage === 0 && !isAnyInProgress(node)) {
+        displayStatus = "Başlanmadı";
     }
     else {
-        gosterilecekDurum = "Devam Ediliyor";
+        displayStatus = "Devam Ediliyor";
     }
 
-    const baslikClass = kokMu
+    const titleClass = isRoot
         ? "font-display text-lg font-semibold text-stone-900 dark:text-stone-100"
         : hasChildren
             ? "text-[15px] font-semibold text-stone-900 dark:text-stone-100"
@@ -169,9 +169,9 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
     return (
 
         <div className={
-            kokMu
+            isRoot
                 ? ""
-                : seviye === 1
+                : level === 1
                     ? "mt-4 mb-2 ml-2 pl-4 pr-2 py-3 rounded-xl bg-stone-100/70 dark:bg-stone-800/40"
                     : "pl-4 ml-2 mt-1 border-l border-stone-200 dark:border-stone-800"
         }>
@@ -181,57 +181,57 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                     <div className="flex items-center flex-wrap gap-2">
                         {hasChildren ? (
                             <button
-                                onClick={() => setAcikGlobal(node.id, !acik)}
-                                aria-label={acik ? "Alt konuları gizle" : "Alt konuları göster"}
+                                onClick={() => setExpandedGlobal(node.id, !expanded)}
+                                aria-label={expanded ? "Alt konuları gizle" : "Alt konuları göster"}
                                 className="w-5 h-5 flex items-center justify-center text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 text-xs"
                             >
-                                {acik ? "▾" : "▸"}
+                                {expanded ? "▾" : "▸"}
                             </button>
                         ) : (
                             <span className="w-5 h-5 flex-shrink-0" />
                         )}
 
-                        {kokMu ? (
+                        {isRoot ? (
                             <Link
                                 to={`/ac/${node.id}`}
-                                state={{ renkIndex }}
-                                className={`${baslikClass} hover:text-[var(--accent)] transition`}
+                                state={{ colorIndex }}
+                                className={`${titleClass} hover:text-[var(--accent)] transition`}
                             >
-                                {node.baslik}
+                                {node.title}
                             </Link>
                         ) : (
                             <>
-                                {node.secilebilir || node.baglanti || altSecimVarMi(node) ? (
+                                {node.selectable || node.connection || hasSelectableChild(node) ? (
                                     <span
                                         title={
-                                            node.secilebilir
+                                            node.selectable
                                                 ? "Bu durum, seçtiğin alt konuya göre otomatik belirlenir"
                                                 : "Bu durum, alt konuları tek tek tamamlayınca otomatik belirlenir"
                                         }
                                         className="flex-shrink-0 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[var(--accent-bg)] text-[var(--accent)]"
                                     >
-                                        {gosterilecekDurum}
+                                        {displayStatus}
                                     </span>
                                 ) : (
                                     <button
                                         onClick={() => {
                                             if (hasChildren) {
-                                                const yeniDurum = gosterilecekDurum === "Tamamlandı" ? "Başlanmadı" : "Tamamlandı";
-                                                altKonularinIdleri(node).forEach((id) => updateDurum(id, yeniDurum));
+                                                const newStatus = displayStatus === "Tamamlandı" ? "Başlanmadı" : "Tamamlandı";
+                                                getChildTopicIds(node).forEach((id) => updateStatus(id, newStatus));
                                             } else {
-                                                updateDurum(node.id, sonrakiDurum(node.durum));
+                                                updateStatus(node.id, getNextStatus(node.status));
                                             }
                                         }}
                                         aria-label="Durumu değiştir"
-                                        title={`${gosterilecekDurum} — tıkla, ilerlet`}
-                                        className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full cursor-pointer hover:bg-stone-200/60 dark:hover:bg-stone-700/60 hover:scale-110 transition ${durumIkonRenkleri[gosterilecekDurum]}`}
+                                        title={`${displayStatus} — tıkla, ilerlet`}
+                                        className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full cursor-pointer hover:bg-stone-200/60 dark:hover:bg-stone-700/60 hover:scale-110 transition ${statusIconColors[displayStatus]}`}
                                     >
-                                        {gosterilecekDurum === "Tamamlandı" ? (
+                                        {displayStatus === "Tamamlandı" ? (
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                                                 <circle cx="12" cy="12" r="9" />
                                                 <path d="M8.5 12.5l2.5 2.5 5-5" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
-                                        ) : gosterilecekDurum === "Devam Ediliyor" ? (
+                                        ) : displayStatus === "Devam Ediliyor" ? (
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
                                                 <circle cx="12" cy="12" r="9" />
                                                 <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none" />
@@ -244,19 +244,19 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                                     </button>
                                 )}
 
-                                <p className={baslikClass}>
-                                    {node.baslik}
-                                    {node.secilebilir && (
+                                <p className={titleClass}>
+                                    {node.title}
+                                    {node.selectable && (
                                         <span className="ml-1 text-[10px] font-normal text-stone-400 dark:text-stone-500">
                                             (birini seç)
                                         </span>
                                     )}
-                                    {node.baglanti && (
+                                    {node.connection && (
                                         <span className="ml-1 text-[10px] font-normal text-stone-400 dark:text-stone-500">
                                             (bağlı roadmap, alt konulardan takip et)
                                         </span>
                                     )}
-                                    {onerildi && (
+                                    {isSuggested && (
                                         <span className="ml-1 text-[10px] font-normal text-[var(--accent)]">
                                             ★ Önerilen
                                         </span>
@@ -265,18 +265,18 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                             </>
                         )}
 
-                        {kokMu && (
+                        {isRoot && (
                             <>
                                 <Link
                                     to={`/roadmap/${node.id}`}
-                                    state={{ renkIndex, geriYolu, geriBaslik }}
+                                    state={{ colorIndex, backPath, backLabel }}
                                     className="text-xs text-stone-400 hover:text-[var(--accent)] dark:text-stone-500 transition"
                                 >
                                     Detaylar →
                                 </Link>
                                 <Link
                                     to={`/akis/${node.id}`}
-                                    state={{ renkIndex, geriYolu, geriBaslik }}
+                                    state={{ colorIndex, backPath, backLabel }}
                                     className="text-xs text-stone-400 hover:text-[var(--accent)] dark:text-stone-500 transition"
                                 >
                                     Akış Şeması →
@@ -285,11 +285,11 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                         )}
                     </div>
 
-                    {!kokMu && (
+                    {!isRoot && (
                         <div className="flex items-center gap-3 mt-1 ml-1">
                             <Link
                                 to={`/roadmap/${node.id}`}
-                                state={{ renkIndex, geriYolu, geriBaslik }}
+                                state={{ colorIndex, backPath, backLabel }}
                                 className="text-xs text-stone-400 hover:text-[var(--accent)] dark:text-stone-500 transition"
                             >
                                 Detaylar →
@@ -301,8 +301,8 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                 <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                         onClick={() => {
-                            setEkleAcik(!ekleAcik);
-                            setAcikGlobal(node.id, true);
+                            setIsAddOpen(!isAddOpen);
+                            setExpandedGlobal(node.id, true);
                         }}
                         aria-label="Alt konu ekle"
                         className="w-6 h-6 flex items-center justify-center rounded-full text-stone-300 hover:text-[var(--accent)] hover:bg-stone-100 dark:text-stone-600 dark:hover:bg-stone-800 transition"
@@ -314,11 +314,11 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
 
                     <button
                         onClick={() => {
-                            const mesaj = kokMu
-                                ? `"${node.baslik}" roadmap'ini tamamen silmek istediğine emin misin?`
-                                : `"${node.baslik}" konusunu (ve varsa alt konularını) silmek istediğine emin misin?`;
-                            if (window.confirm(mesaj)) {
-                                konuSil(node.id);
+                            const message = isRoot
+                                ? `"${node.title}" roadmap'ini tamamen silmek istediğine emin misin?`
+                                : `"${node.title}" konusunu (ve varsa alt konularını) silmek istediğine emin misin?`;
+                            if (window.confirm(message)) {
+                                deleteTopic(node.id);
                             }
                         }}
                         aria-label="Sil"
@@ -331,47 +331,47 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                 </div>
             </div>
 
-            {kokMu && (
+            {isRoot && (
                 <div className="mt-2">
                     <div className="w-full bg-stone-100 dark:bg-stone-800 rounded-full h-2 overflow-hidden">
                         <div
                             className="h-full bg-[var(--accent)]/60 transition-all"
-                            style={{ width: `${yuzde}%` }}
+                            style={{ width: `${percentage}%` }}
                         />
                     </div>
                     <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">
-                        {gosterilecekDurum} · %{yuzde}
+                        {displayStatus} · %{percentage}
                     </p>
                 </div>
             )}
 
-            {ekleAcik && (
+            {isAddOpen && (
                 <div className="flex gap-1 mt-2 mb-1">
 
                     <input
                         type="text"
-                        value={altKonuBaslik}
-                        onChange={(e) => setAltKonuBaslik(e.target.value)}
-                        placeholder={kokMu ? "Konu ekle" : "Alt konu ekle"}
+                        value={newTopicTitle}
+                        onChange={(e) => setNewTopicTitle(e.target.value)}
+                        placeholder={isRoot ? "Konu ekle" : "Alt konu ekle"}
                         autoFocus
                         className="border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                     />
 
                     <button
                         onClick={() => {
-                            if (!altKonuBaslik.trim()) {
+                            if (!newTopicTitle.trim()) {
                                 return;
                             }
-                            konuEkle(node.id, altKonuBaslik);
-                            setAltKonuBaslik("");
-                            setEkleAcik(false);
+                            addTopic(node.id, newTopicTitle);
+                            setNewTopicTitle("");
+                            setIsAddOpen(false);
                         }}
                         className="text-xs px-2 bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 rounded-md transition"
                     >
                         Ekle
                     </button>
                     <button
-                        onClick={() => setEkleAcik(false)}
+                        onClick={() => setIsAddOpen(false)}
                         className="text-xs px-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
                     >
                         ✕
@@ -379,17 +379,17 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
                 </div>
             )}
 
-            {acik && (
+            {expanded && (
                 <>
                     {node.children.map((child) => (
-                        child.gizliMi ? null : (
-                            <KonuSatiri
+                        child.isHidden ? null : (
+                            <TopicRow
                                 node={child}
                                 key={child.id}
-                                derinlik={node.baglanti ? 1 : seviye + 1}
-                                renkIndex={renkIndex}
-                                geriYolu={geriYolu}
-                                geriBaslik={geriBaslik}
+                                depth={node.connection ? 1 : level + 1}
+                                colorIndex={colorIndex}
+                                backPath={backPath}
+                                backLabel={backLabel}
                             />
                         )
                     ))}
@@ -399,4 +399,4 @@ function KonuSatiri({ node, kokMu, derinlik, renkIndex, baslangicAcik, geriYolu,
     );
 }
 
-export default KonuSatiri;
+export default TopicRow;

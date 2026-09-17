@@ -1,13 +1,13 @@
-export type Durum = "Başlanmadı" | "Devam Ediliyor" | "Tamamlandı";
+export type Status = "Başlanmadı" | "Devam Ediliyor" | "Tamamlandı";
 
 export interface RoadmapNode {
     id: number;
-    baslik: string;
-    durum: Durum;
+    title: string;
+    status: Status;
     children: RoadmapNode[];
-    aciklama?: string;
-    kaynaklar?: string[];
-    secilebilir?: boolean;
-    gizliMi?: boolean;
-    baglanti?: boolean;
+    description?: string;
+    resources?: string[];
+    selectable?: boolean;
+    isHidden?: boolean;
+    connection?: boolean;
 }

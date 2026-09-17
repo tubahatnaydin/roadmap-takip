@@ -1,21 +1,21 @@
 import { Routes, Route, Link } from 'react-router-dom'
-import AnaSayfa from './AnaSayfa'
-import RoadmapDetay from './RoadmapDetay'
-import AkisGorunumu from './AkisGorunumu'
-import RoadmapAcik from './RoadmapAcik'
-import KayitOl from './KayitOl'
-import GirisYap from './GirisYap'
-import { useTemaStore } from './temaStore'
-import { useKullaniciStore } from './kullaniciStore'
+import HomePage from './pages/Home/HomePage'
+import RoadmapDetailPage from './pages/RoadmapDetail/RoadmapDetailPage'
+import FlowViewPage from './pages/FlowView/FlowViewPage'
+import RoadmapOpenPage from './pages/RoadmapOpen/RoadmapOpenPage'
+import LoginPage from './pages/Login/LoginPage'
+import RegisterPage from './pages/Register/RegisterPage'
+import { useThemeStore } from './store/themeStore'
+import { useUserStore } from './store/userStore'
 
 function App() {
-  const tema = useTemaStore((state) => state.tema);
-  const temaDegistir = useTemaStore((state) => state.temaDegistir);
-  const kullanici = useKullaniciStore((state) => state.kullanici);
-  const cikisYap = useKullaniciStore((state) => state.cikisYap);
+  const theme = useThemeStore((state) => state.theme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const user = useUserStore((state) => state.user);
+  const logout = useUserStore((state) => state.logout);
 
   return (
-    <div className={tema === "dark" ? "dark" : ""}>
+    <div className={theme === "dark" ? "dark" : ""}>
       <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
 
         <header className="sticky top-0 z-10 backdrop-blur bg-stone-50/80 dark:bg-stone-950/80 border-b border-stone-200 dark:border-stone-800">
@@ -30,13 +30,13 @@ function App() {
             </Link>
 
             <div className="flex items-center gap-3">
-              {kullanici ? (
+              {user ? (
                 <>
                   <span className="text-sm text-stone-500 dark:text-stone-400 hidden sm:inline">
-                    Merhaba, {kullanici.ad}
+                    Merhaba, {user.name}
                   </span>
                   <button
-                    onClick={cikisYap}
+                    onClick={logout}
                     className="text-sm text-stone-400 hover:text-[var(--accent)] dark:text-stone-500 transition"
                   >
                     Çıkış Yap
@@ -54,11 +54,11 @@ function App() {
               )}
 
               <button
-                onClick={temaDegistir}
+                onClick={toggleTheme}
                 className="w-9 h-9 flex items-center justify-center rounded-full border border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 transition"
                 aria-label="Tema değiştir"
               >
-                {tema === "dark" ? (
+                {theme === "dark" ? (
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
                     <circle cx="12" cy="12" r="4" />
                     <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
@@ -75,12 +75,12 @@ function App() {
 
         <main className="max-w-5xl mx-auto px-4 py-6">
           <Routes>
-            <Route path="/" element={<AnaSayfa />} />
-            <Route path="/roadmap/:id" element={<RoadmapDetay />} />
-            <Route path="/akis/:id" element={<AkisGorunumu />} />
-            <Route path="/ac/:id" element={<RoadmapAcik />} />
-            <Route path="/kayit-ol" element={<KayitOl />} />
-            <Route path="/giris" element={<GirisYap />} />
+            <Route path="/" element={<HomePage />} />
+            <Route path="/roadmap/:id" element={<RoadmapDetailPage />} />
+            <Route path="/akis/:id" element={<FlowViewPage />} />
+            <Route path="/ac/:id" element={<RoadmapOpenPage />} />
+            <Route path="/kayit-ol" element={<RegisterPage />} />
+            <Route path="/giris" element={<LoginPage />} />
           </Routes>
         </main>
       </div>

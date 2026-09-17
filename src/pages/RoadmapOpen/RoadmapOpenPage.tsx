@@ -1,24 +1,24 @@
 import type { CSSProperties } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
-import { useRoadmapStore } from "./store";
-import { useTemaStore } from "./temaStore";
-import KonuSatiri from "./KonuSatiri";
-import { renkler, kokIndexBul } from "./renkler";
-import { useScrollRestorasyon } from "./useScrollRestorasyon";
+import { useRoadmapStore } from "../../store/roadmapStore";
+import { useThemeStore } from "../../store/themeStore";
+import TopicRow from "../../components/TopicRow";
+import { colors, findRootIndex } from "../../utils/colors";
+import { useScrollRestore } from "../../hooks/useScrollRestore";
 
-function RoadmapAcik() {
+function RoadmapOpenPage() {
     const { id } = useParams();
     const roadmaps = useRoadmapStore((state) => state.roadmaps);
-    const tema = useTemaStore((state) => state.tema);
+    const theme = useThemeStore((state) => state.theme);
     const location = useLocation();
-    useScrollRestorasyon();
+    useScrollRestore();
 
     const roadmapId = Number(id);
     const roadmap = roadmaps.find((r) => r.id === roadmapId);
 
-    const gelenRenkIndex = (location.state as { renkIndex?: number } | null)?.renkIndex;
-    const renkIndex = gelenRenkIndex ?? kokIndexBul(roadmaps, roadmapId);
-    const renk = renkler[renkIndex % renkler.length];
+    const incomingColorIndex = (location.state as { colorIndex?: number } | null)?.colorIndex;
+    const colorIndex = incomingColorIndex ?? findRootIndex(roadmaps, roadmapId);
+    const color = colors[colorIndex % colors.length];
 
     if (!roadmap) {
         return (
@@ -35,8 +35,8 @@ function RoadmapAcik() {
         <div
             className="max-w-2xl mx-auto"
             style={{
-                "--accent": tema === "dark" ? renk.accentDark : renk.accent,
-                "--accent-bg": tema === "dark" ? renk.accentBgDark : renk.accentBg,
+                "--accent": theme === "dark" ? color.accentDark : color.accent,
+                "--accent-bg": theme === "dark" ? color.accentBgDark : color.accentBg,
             } as CSSProperties}
         >
             <Link
@@ -47,17 +47,17 @@ function RoadmapAcik() {
             </Link>
 
             <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4 mt-3">
-                <KonuSatiri
+                <TopicRow
                     node={roadmap}
-                    kokMu={true}
-                    renkIndex={renkIndex}
-                    baslangicAcik={true}
-                    geriYolu={`/ac/${roadmap.id}`}
-                    geriBaslik={`${roadmap.baslik}'e Dön`}
+                    isRoot={true}
+                    colorIndex={colorIndex}
+                    initiallyExpanded={true}
+                    backPath={`/ac/${roadmap.id}`}
+                    backLabel={`${roadmap.title}'e Dön`}
                 />
             </div>
         </div>
     );
 }
 
-export default RoadmapAcik;
+export default RoadmapOpenPage;

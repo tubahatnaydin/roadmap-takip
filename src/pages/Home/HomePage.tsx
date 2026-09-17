@@ -1,17 +1,17 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { useRoadmapStore } from "./store";
-import { useTemaStore } from "./temaStore";
-import KonuSatiri from "./KonuSatiri";
-import { renkler } from "./renkler";
-import { useScrollRestorasyon } from "./useScrollRestorasyon";
+import { useRoadmapStore } from "../../store/roadmapStore";
+import { useThemeStore } from "../../store/themeStore";
+import TopicRow from "../../components/TopicRow";
+import { colors } from "../../utils/colors";
+import { useScrollRestore } from "../../hooks/useScrollRestore";
 
-function AnaSayfa() {
+function HomePage() {
     const roadmaps = useRoadmapStore((state) => state.roadmaps);
-    const roadmapEkle = useRoadmapStore((state) => state.roadmapEkle);
-    const tema = useTemaStore((state) => state.tema);
-    const [yeniKonuBaslik, setYeniKonuBaslik] = useState("");
-    useScrollRestorasyon();
+    const addRoadmap = useRoadmapStore((state) => state.addRoadmap);
+    const theme = useThemeStore((state) => state.theme);
+    const [newRoadmapTitle, setNewRoadmapTitle] = useState("");
+    useScrollRestore();
 
     return (
         <>
@@ -27,18 +27,18 @@ function AnaSayfa() {
             <div className="flex flex-col sm:flex-row gap-2 mb-8 max-w-md mx-auto">
                 <input
                     type="text"
-                    value={yeniKonuBaslik}
-                    onChange={(e) => setYeniKonuBaslik(e.target.value)}
+                    value={newRoadmapTitle}
+                    onChange={(e) => setNewRoadmapTitle(e.target.value)}
                     placeholder="Yeni roadmap adı (örn. Backend Developer)"
                     className="flex-1 border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                 />
                 <button
                     onClick={() => {
-                        if (!yeniKonuBaslik.trim()) {
+                        if (!newRoadmapTitle.trim()) {
                             return;
                         }
-                        roadmapEkle(yeniKonuBaslik);
-                        setYeniKonuBaslik("");
+                        addRoadmap(newRoadmapTitle);
+                        setNewRoadmapTitle("");
                     }}
                     className="px-5 py-2 bg-[var(--accent)] text-white rounded-full text-sm font-medium hover:opacity-90 transition"
                 >
@@ -48,17 +48,17 @@ function AnaSayfa() {
 
             <div className="flex flex-col gap-5">
                 {roadmaps.map((roadmap, index) => {
-                    const renk = renkler[index % renkler.length];
+                    const color = colors[index % colors.length];
                     return (
                         <div
                             key={roadmap.id}
                             style={{
-                                "--accent": tema === "dark" ? renk.accentDark : renk.accent,
-                                "--accent-bg": tema === "dark" ? renk.accentBgDark : renk.accentBg,
+                                "--accent": theme === "dark" ? color.accentDark : color.accent,
+                                "--accent-bg": theme === "dark" ? color.accentBgDark : color.accentBg,
                             } as CSSProperties}
                             className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-4"
                         >
-                            <KonuSatiri node={roadmap} kokMu={true} renkIndex={index} />
+                            <TopicRow node={roadmap} isRoot={true} colorIndex={index} />
                         </div>
                     );
                 })}
@@ -66,4 +66,4 @@ function AnaSayfa() {
         </>
     );
 }
-export default AnaSayfa;
+export default HomePage;
